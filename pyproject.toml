@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "chinese2lean"
+version = "0.1.0"
+description = "将受控中文数学命题和证明转换为可验证的 Lean 4 + Mathlib 代码"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [{name = "Chinese2Lean contributors"}]
+dependencies = ["pydantic>=2.9,<3", "typer>=0.12,<1", "PyYAML>=6.0,<7"]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.115,<1", "uvicorn>=0.32,<1"]
+dev = ["pytest>=8.3,<10", "ruff>=0.8,<1", "mypy>=1.13,<2", "types-PyYAML>=6.0"]
+
+[project.scripts]
+chinese2lean = "chinese2lean.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chinese2lean"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+exclude = ["work"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]
+# Full-width Chinese punctuation and Lean's Unicode symbols are intentional domain syntax.
+ignore = ["RUF001"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["chinese2lean"]
+mypy_path = "src"
+

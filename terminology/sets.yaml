@@ -1,0 +1,19 @@
+version: "1"
+entries:
+  - id: set.member
+    canonical_zh: 属于
+    aliases: [是其中的元素]
+    semantic_kind: relation
+    lean_template: "{value} ∈ {set}"
+    precedence: 30
+    examples: [{chinese: "x 属于 A", lean: "x ∈ A"}]
+    notes: 集合成员关系
+  - id: set.subset
+    canonical_zh: 包含于
+    aliases: [是其子集]
+    semantic_kind: relation
+    lean_template: "{left} ⊆ {right}"
+    precedence: 30
+    examples: [{chinese: "A 包含于 B", lean: "A ⊆ B"}]
+    notes: 子集关系
+

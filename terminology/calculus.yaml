@@ -1,0 +1,11 @@
+version: "1"
+entries:
+  - id: calculus.derivative
+    canonical_zh: 导数
+    aliases: [微分]
+    semantic_kind: reserved_domain
+    lean_template: "HasDerivAt"
+    precedence: 5
+    examples: [{chinese: "函数 f 的导数", lean: "HasDerivAt f f' x"}]
+    notes: 第一阶段仅登记术语，不自动解析微积分命题
+

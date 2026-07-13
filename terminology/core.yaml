@@ -1,0 +1,35 @@
+version: "1"
+entries:
+  - id: type.real
+    canonical_zh: 实数
+    aliases: [实数集中的数]
+    semantic_kind: type
+    lean_template: "ℝ"
+    precedence: 20
+    examples: [{chinese: "x 是实数", lean: "(x : ℝ)"}]
+    notes: 实数类型
+  - id: type.nat
+    canonical_zh: 自然数
+    aliases: [非负整数]
+    semantic_kind: type
+    lean_template: "ℕ"
+    precedence: 20
+    examples: [{chinese: "n 是自然数", lean: "(n : ℕ)"}]
+    notes: 自然数类型
+  - id: type.int
+    canonical_zh: 整数
+    aliases: []
+    semantic_kind: type
+    lean_template: "ℤ"
+    precedence: 20
+    examples: [{chinese: "z 是整数", lean: "(z : ℤ)"}]
+    notes: 整数类型
+  - id: type.rat
+    canonical_zh: 有理数
+    aliases: []
+    semantic_kind: type
+    lean_template: "ℚ"
+    precedence: 20
+    examples: [{chinese: "q 是有理数", lean: "(q : ℚ)"}]
+    notes: 有理数类型
+

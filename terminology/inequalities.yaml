@@ -1,0 +1,27 @@
+version: "1"
+entries:
+  - id: inequality.ge
+    canonical_zh: ">="
+    aliases: [大于等于, 不小于]
+    semantic_kind: relation
+    lean_template: "{left} ≥ {right}"
+    precedence: 30
+    examples: [{chinese: "x 不小于 0", lean: "x ≥ 0"}]
+    notes: 大于等于
+  - id: inequality.le
+    canonical_zh: "<="
+    aliases: [小于等于, 不大于]
+    semantic_kind: relation
+    lean_template: "{left} ≤ {right}"
+    precedence: 30
+    examples: [{chinese: "x 不大于 1", lean: "x ≤ 1"}]
+    notes: 小于等于
+  - id: inequality.ne
+    canonical_zh: "!="
+    aliases: [不等于]
+    semantic_kind: relation
+    lean_template: "{left} ≠ {right}"
+    precedence: 30
+    examples: [{chinese: "x 不等于 0", lean: "x ≠ 0"}]
+    notes: 不等关系
+

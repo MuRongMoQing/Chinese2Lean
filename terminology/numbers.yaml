@@ -1,0 +1,11 @@
+version: "1"
+entries:
+  - id: number.positive
+    canonical_zh: 正数
+    aliases: [正的数, 大于零的数]
+    semantic_kind: predicate
+    lean_template: "{value} > 0"
+    precedence: 20
+    examples: [{chinese: "x 是正数", lean: "x > 0"}]
+    notes: 严格大于零
+

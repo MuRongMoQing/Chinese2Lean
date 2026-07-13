@@ -1,0 +1,19 @@
+version: "1"
+entries:
+  - id: logic.forall
+    canonical_zh: 对任意
+    aliases: [对于任意, 任意, 任取, 对所有, 对每一个]
+    semantic_kind: quantifier
+    lean_template: "∀ {variable}, {body}"
+    precedence: 10
+    examples: [{chinese: "对任意实数 x", lean: "∀ x : ℝ"}]
+    notes: 全称量词
+  - id: logic.exists
+    canonical_zh: 存在
+    aliases: [至少存在一个]
+    semantic_kind: quantifier
+    lean_template: "∃ {variable}, {body}"
+    precedence: 10
+    examples: [{chinese: "存在自然数 n", lean: "∃ n : ℕ"}]
+    notes: 存在量词
+

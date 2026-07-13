@@ -1,0 +1,11 @@
+version: "1"
+entries:
+  - id: algebra.add_comm
+    canonical_zh: 加法交换律
+    aliases: [加法可交换]
+    semantic_kind: theorem_concept
+    lean_template: "add_comm"
+    precedence: 10
+    examples: [{chinese: "自然数加法交换律", lean: "Nat.add_comm"}]
+    notes: 必须经本地索引检索并由 Lean 验证
+
