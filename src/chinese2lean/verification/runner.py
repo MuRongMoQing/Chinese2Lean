@@ -37,7 +37,7 @@ def _as_text(value: str | bytes | None) -> str:
 
 class LeanRunner:
     def __init__(
-        self, workspace: Path, *, timeout_seconds: float = 20.0, max_source_bytes: int = 1_000_000
+        self, workspace: Path, *, timeout_seconds: float = 60.0, max_source_bytes: int = 1_000_000
     ) -> None:
         self.workspace = workspace.resolve()
         self.timeout_seconds = timeout_seconds

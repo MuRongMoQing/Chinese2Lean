@@ -100,6 +100,24 @@ def test_repair_attempts_are_bounded_audited_and_statement_preserving() -> None:
     assert attempt.verified
 
 
+def test_default_timeout_has_headroom_for_windows_lean_startup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import subprocess
+
+    observed: dict[str, object] = {}
+
+    def complete(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        observed['timeout'] = kwargs['timeout']
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout='', stderr='')
+
+    monkeypatch.setattr(subprocess, 'run', complete)
+    result = LeanRunner(ROOT).verify_code('theorem timeout_headroom : True := by\n  trivial\n')
+
+    assert result.success
+    assert observed['timeout'] == 60.0
+
+
 def test_timeout_returns_structured_diagnostic(monkeypatch: pytest.MonkeyPatch) -> None:
     import subprocess
 
