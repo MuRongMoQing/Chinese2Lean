@@ -6,6 +6,8 @@ Lean 编译器验证。项目不承诺理解任意自然语言证明；自由散
 
 ## 环境与安装
 
+Windows 新设备的可重复引导方式见 [开发环境引导](docs/development_setup.md)。
+
 需要 Python 3.12+、Elan 和仓库锁定的 Lean/Mathlib：
 
     elan toolchain install leanprover/lean4:v4.19.0
