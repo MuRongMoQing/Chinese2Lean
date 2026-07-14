@@ -107,6 +107,21 @@ function Get-ValidationChecks {
     )
 }
 
+function Ensure-TargetParentDirectory {
+    param(
+        [Parameter(Mandatory)]
+        [string]$TargetPath
+    )
+
+    $parent = Split-Path -Parent $TargetPath
+    if (-not $parent) {
+        throw "Unable to determine the parent directory for target: $TargetPath"
+    }
+    if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+        New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    }
+}
+
 function Get-NormalizedGitPath {
     param(
         [Parameter(Mandatory)]
@@ -178,7 +193,13 @@ if ($SelfTest) {
         throw "Path normalization self-test failed: $normalized"
     }
 
+    $driveRoot = [System.IO.Path]::GetPathRoot(
+        [System.IO.Path]::GetFullPath($env:TEMP)
+    )
+    Ensure-TargetParentDirectory (Join-Path $driveRoot 'Chinese2Lean-self-test')
+
     Write-Host 'Bootstrap self-test passed.'
+    Write-Host 'Drive-root parent handling: passed'
     Write-Host "Repository: $Repository"
     Write-Host "Target: $(Get-NormalizedGitPath $Target)"
     Write-Host "Branch: $Branch"
@@ -218,8 +239,7 @@ else {
         }
     }
     else {
-        $parent = Split-Path -Parent $Target
-        New-Item -ItemType Directory -Force -Path $parent | Out-Null
+        Ensure-TargetParentDirectory $Target
     }
 
     Invoke-CheckedNative {

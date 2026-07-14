@@ -36,6 +36,7 @@ def test_windows_bootstrap_exposes_an_offline_self_test() -> None:
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert "Bootstrap self-test passed." in completed.stdout
+    assert "Drive-root parent handling: passed" in completed.stdout
     assert "Validation checks: pytest, ruff, mypy, verify-all, version" in completed.stdout
 
 
