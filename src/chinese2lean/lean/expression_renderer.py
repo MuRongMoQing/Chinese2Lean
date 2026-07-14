@@ -1,4 +1,5 @@
 from chinese2lean.ir.models import Expr
+from chinese2lean.lean.type_mapper import render_type
 
 _OPERATORS = {"!=": "≠", "<=": "≤", ">=": "≥"}
 _PRECEDENCE = {
@@ -28,8 +29,22 @@ def render_expr(expr: Expr, parent_precedence: int = 0) -> str:
     if expr.kind == "application":
         return " ".join([str(expr.value), *(f"({render_expr(arg)})" for arg in expr.args)])
     if expr.kind == "unary":
-        rendered = render_expr(expr.args[0], 9)
-        return f"{expr.operator}{rendered}"
+        rendered = render_expr(expr.args[0])
+        if expr.args[0].kind == "binary":
+            rendered = f"({rendered})"
+        result = f"{expr.operator}{rendered}"
+        if expr.operator == "-" and parent_precedence >= _PRECEDENCE["^"]:
+            return f"({result})"
+        return result
+    if expr.kind == "quantifier" and expr.operator and expr.binder_type:
+        symbols = {"forall": "∀", "exists": "∃"}
+        symbol = symbols.get(expr.operator)
+        if symbol is None:
+            raise ValueError(f"未知量词：{expr.operator}")
+        result = (
+            f"{symbol} {expr.value} : {render_type(expr.binder_type)}, {render_expr(expr.args[0])}"
+        )
+        return f"({result})" if parent_precedence else result
     if expr.kind == "binary" and expr.operator:
         precedence = _PRECEDENCE[expr.operator]
         left = render_expr(expr.args[0], precedence)

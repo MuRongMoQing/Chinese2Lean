@@ -12,6 +12,7 @@ from chinese2lean.ir.models import (
     VariableDecl,
     WarningItem,
 )
+from chinese2lean.ir.type_checking import validate_types
 from chinese2lean.ir.validation import validate_ir
 from chinese2lean.lean.names import NameAllocator, theorem_name
 from chinese2lean.parser.controlled_chinese import split_sections
@@ -50,6 +51,11 @@ PRECEDENCE = {
     "/": 7,
     "^": 8,
 }
+TYPE_AMBIGUITY_CODES = {
+    "NAT_SUBTRACTION_AMBIGUOUS",
+    "DIVISION_SEMANTICS_AMBIGUOUS",
+    "MIXED_NUMERIC_TYPES",
+}
 
 
 class ParseError(ValueError):
@@ -62,12 +68,62 @@ class _Token:
     kind: str
 
 
+def _expression_signature(expr: Expr) -> tuple[object, ...]:
+    return (
+        expr.kind,
+        expr.operator,
+        expr.value,
+        expr.binder_type,
+        tuple(_expression_signature(argument) for argument in expr.args),
+    )
+
+
+def _assumption_signatures(ir: TheoremIR) -> tuple[tuple[object, ...], ...]:
+    flattened: list[tuple[object, ...]] = []
+
+    def collect(expression: Expr) -> None:
+        if expression.kind == "binary" and expression.operator == "∧":
+            for argument in expression.args:
+                collect(argument)
+        else:
+            flattened.append(_expression_signature(expression))
+
+    for assumption in ir.assumptions:
+        collect(assumption.proposition)
+    return tuple(flattened)
+
+
 class ExpressionParser:
     def parse(self, text: str, span: SourceSpan | None = None) -> Expr:
+        raw = text.strip().replace("，", ",")
+        quantifier = re.fullmatch(
+            r"(对任意|存在)\s*(实数|自然数|整数|有理数|Real|Nat|Int|Rat)\s+"
+            r"([A-Za-z_][A-Za-z0-9_']*)\s*,\s*(.+)",
+            raw,
+        )
+        if quantifier:
+            keyword, type_name, variable_name, body = quantifier.groups()
+            return Expr(
+                kind="quantifier",
+                operator="forall" if keyword == "对任意" else "exists",
+                value=variable_name,
+                args=[self.parse(body)],
+                inferred_type="Prop",
+                binder_type=TYPE_NAMES[type_name],
+                source_span=span,
+            )
+        conditional = re.fullmatch(
+            r"(?:如果|若)\s*(.+?)\s*,\s*(?:那么|则)\s*(.+)",
+            raw,
+        )
+        if conditional:
+            premise, consequence = conditional.groups()
+            raw = f"({premise}) → ({consequence})"
         normalized = (
-            text.strip()
-            .replace("且", "∧")
+            raw.replace("并非", "¬")
             .replace("并且", "∧")
+            .replace("同时", "∧")
+            .replace("且", "∧")
             .replace("或者", "∨")
             .replace("不等于", "!=")
             .replace("大于等于", ">=")
@@ -106,8 +162,10 @@ class ExpressionParser:
             raise ParseError("表达式意外结束")
         token = self.tokens[self.position]
         self.position += 1
-        if token.value in {"-", "¬"}:
-            left = Expr(kind="unary", operator=token.value, args=[self._expression(9)])
+        if token.value == "-":
+            left = Expr(kind="unary", operator="-", args=[self._expression(PRECEDENCE["^"])])
+        elif token.value == "¬":
+            left = Expr(kind="unary", operator="¬", args=[self._expression(PRECEDENCE["="])])
         elif token.value == "(":
             left = self._expression(0)
             self._expect(")")
@@ -154,6 +212,13 @@ class StatementParser:
     def __init__(self) -> None:
         self.expressions = ExpressionParser()
 
+    @staticmethod
+    def _finalize_ir(ir: TheoremIR) -> TheoremIR:
+        validation = [*validate_ir(ir), *validate_types(ir)]
+        ir.warnings.extend(validation)
+        ir.ambiguities.extend(item for item in validation if item.code in TYPE_AMBIGUITY_CODES)
+        return ir
+
     def parse(self, text: str) -> TheoremIR:
         sections = split_sections(text)
         if not sections["name"]:
@@ -164,6 +229,17 @@ class StatementParser:
         variables: list[VariableDecl] = []
         mappings: dict[str, str] = {source_name: lean_theorem_name}
         warnings: list[WarningItem] = []
+        ambiguities: list[WarningItem] = []
+        if len(sections["conclusion"]) > 1:
+            conflict = WarningItem(
+                code="STRUCTURED_FIELD_CONFLICT",
+                message="结构化输入包含多个结论，无法静默选择。",
+                location=SourceSpan(text="\n".join(sections["conclusion"])),
+                details={"field": "conclusion", "values": sections["conclusion"]},
+            )
+            warnings.append(conflict)
+            ambiguities.append(conflict)
+
         for index, line in enumerate(sections["variables"]):
             for declaration in re.split(r"[,;]", line):
                 match = re.fullmatch(
@@ -231,15 +307,47 @@ class StatementParser:
             conclusion=conclusion,
             proof_steps=proof_steps,
             warnings=warnings,
+            ambiguities=ambiguities,
             name_mappings=mappings,
         )
-        ir.warnings.extend(validate_ir(ir))
-        return ir
+        if "对任意" in text and "那么" in text:
+            try:
+                natural = self._parse_natural_sentence(text)
+            except ParseError:
+                natural = None
+            if natural is not None and natural.theorem_name != "invalid_theorem":
+                conflicting_fields: list[str] = []
+                structured_variables = [(item.source_name, item.type_name) for item in ir.variables]
+                natural_variables = [
+                    (item.source_name, item.type_name) for item in natural.variables
+                ]
+                if structured_variables != natural_variables:
+                    conflicting_fields.append("variables")
+                if _assumption_signatures(ir) != _assumption_signatures(natural):
+                    conflicting_fields.append("assumptions")
+                if _expression_signature(natural.conclusion) != _expression_signature(conclusion):
+                    conflicting_fields.append("conclusion")
+                if conflicting_fields:
+                    start = text.find("对任意")
+                    conflict = WarningItem(
+                        code="STRUCTURED_BODY_CONFLICT",
+                        message="结构化字段与自然语言正文冲突，无法静默选择。",
+                        location=SourceSpan(
+                            start=start,
+                            end=len(text),
+                            text=text[start:],
+                        ),
+                        details={"fields": conflicting_fields},
+                    )
+                    ir.warnings.append(conflict)
+                    ir.ambiguities.append(conflict)
+        return self._finalize_ir(ir)
 
     def _parse_natural_sentence(self, text: str) -> TheoremIR:
         match = re.search(
-            r"对任意(实数|自然数|整数|有理数)\s+([A-Za-z_][A-Za-z0-9_']*)[,，]"
-            r"如果\s*(.+?)[,，]那么\s*(.+?)[。.]*$",
+            r"对任意(实数|自然数|整数|有理数)\s+"
+            r"([A-Za-z_][A-Za-z0-9_']*(?:\s*和\s*[A-Za-z_][A-Za-z0-9_']*)*)\s*,"
+            r"\s*如果\s*(.+?)\s*,\s*那么\s*(.+?)[.]*$",
             text.strip(),
         )
         if not match:
@@ -253,18 +361,24 @@ class StatementParser:
                 warnings=[warning],
                 ambiguities=[warning],
             )
-        type_name, variable_name, assumption_text, conclusion_text = match.groups()
-        variable = VariableDecl(
-            source_name=variable_name,
-            lean_name=variable_name,
-            type_name=TYPE_NAMES[type_name],
-        )
-        return TheoremIR(
+        type_name, variable_text, assumption_text, conclusion_text = match.groups()
+        variable_names = re.split(r"\s*和\s*", variable_text)
+        variables = [
+            VariableDecl(
+                source_name=name,
+                lean_name=name,
+                type_name=TYPE_NAMES[type_name],
+                source_span=SourceSpan(text=variable_text),
+            )
+            for name in variable_names
+        ]
+        ir = TheoremIR(
             theorem_name="controlled_statement",
-            variables=[variable],
+            variables=variables,
             assumptions=[
                 Assumption(name="h1", proposition=self.expressions.parse(assumption_text))
             ],
             conclusion=self.expressions.parse(conclusion_text),
-            name_mappings={variable_name: variable_name},
+            name_mappings={name: name for name in variable_names},
         )
+        return self._finalize_ir(ir)

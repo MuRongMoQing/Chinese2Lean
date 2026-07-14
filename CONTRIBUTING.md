@@ -1,15 +1,22 @@
 # 贡献指南
 
-使用 Python 3.12+。安装 `python -m pip install -e ".[dev,api]"`，提交前运行：
+使用 Python 3.12+，安装开发环境：
 
-```bash
-pytest
-ruff check .
-mypy src
-lake env lean examples/generated/positive_add_one.lean
-```
+    python -m pip install -e ".[dev,api]"
+    lake update
 
-功能开发采用公共 seam 上的红绿测试：先增加一个用户可观察行为的失败测试，再写最小实现。
-不要测试私有实现细节。新增语法必须同步文档、术语词典、IR/Lean 示例和歧义行为。任何绕过
-证明的构造、削弱结论或添加等价假设的变更都会被拒绝。提交信息应说明一个完整纵向切片。
+开发采用公共接口上的红—绿测试。每个语法功能必须同步修改术语词典、解析/IR 测试、Lean
+渲染测试和中文文档；每个缺陷修复必须有回归测试。端到端测试不得模拟 Lean 成功。
+
+提交前运行：
+
+    pytest
+    ruff check .
+    mypy src
+    chinese2lean verify-all examples/generated
+    lake env lean examples/generated/positive_add_one.lean
+
+禁止提交 sorry、admit、新 axiom、unsafe 逃逸、被削弱的结论或新增等价假设。修复代码必须
+保持 statement 哈希，最多尝试三次。新增词条须有稳定 ID、上下文、正例、反例及版本兼容性。
+提交应是一个可独立验证的纵向切片。
 

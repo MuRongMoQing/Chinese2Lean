@@ -18,6 +18,7 @@ def test_diagnostics_parse_location_severity_and_message() -> None:
         "column": 3,
         "code": "UNKNOWN_TACTIC",
         "message": "unknown tactic",
+        "raw_message": "unknown tactic",
     }
     assert diagnostics[1].severity == "warning"
 

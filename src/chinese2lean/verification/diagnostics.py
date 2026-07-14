@@ -13,6 +13,7 @@ class LeanDiagnostic(BaseModel):
     column: int | None = None
     code: str | None = None
     message: str
+    raw_message: str | None = None
 
 
 _LOCATION = re.compile(
@@ -23,11 +24,15 @@ _CODES = {
     "unknown tactic": "UNKNOWN_TACTIC",
     "unknown identifier": "UNKNOWN_IDENTIFIER",
     "unknown constant": "UNKNOWN_IDENTIFIER",
+    "application type mismatch": "APPLICATION_TYPE_MISMATCH",
     "type mismatch": "TYPE_MISMATCH",
-    "failed to synthesize": "SYNTHESIS_FAILED",
+    "failed to synthesize": "FAILED_TO_SYNTHESIZE",
     "declaration uses 'sorry'": "FORBIDDEN_CONSTRUCT",
     "unsolved goals": "UNSOLVED_GOALS",
-    "unexpected token": "SYNTAX_ERROR",
+    "ambiguous": "AMBIGUOUS_TERM",
+    "unexpected token": "PARSER_ERROR",
+    "unknown module": "MISSING_IMPORT",
+    "invalid import": "MISSING_IMPORT",
 }
 
 
@@ -49,8 +54,11 @@ def parse_diagnostics(output: str) -> list[LeanDiagnostic]:
                 column=int(match.group("column")),
                 code=classify_message(match.group("message")),
                 message=match.group("message"),
+                raw_message=match.group("message"),
             )
             diagnostics.append(pending)
         elif line.strip() and pending:
             pending.message += "\n" + line.rstrip()
+            if pending.raw_message is not None:
+                pending.raw_message += "\n" + line.rstrip()
     return diagnostics

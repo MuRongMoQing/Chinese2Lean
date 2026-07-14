@@ -1,10 +1,15 @@
-# Lean 验证与修复
+# Lean 验证与诊断
 
-验证器以 `subprocess.run(["lake", "env", "lean", path], shell=False)` 调用本地 Lean，
-固定超时并捕获标准输出、标准错误、退出码、文件、行列和严重级别。生成文件位于系统临时
-目录，进程工作目录固定为项目 Lean 工作区，用户文本不会进入 shell 命令。
+验证器从 lean-toolchain 定位固定工具链，实际执行参数列表 [lake, env, lean, Generated.lean]，
+shell=False。源码写入自动清理的临时目录；进程固定 cwd、超时、输入大小和 .lean 后缀，
+捕获 stdout、stderr、退出码、命令、锁定环境标志及毫秒耗时。
 
-修复最多三次，每次保存修复前代码、诊断、修改说明、修复后代码和结果。当前确定性修复
-只轮换适合基础代数的受控 tactic。任何 `sorry`、`admit`、`axiom` 或 `unsafe`（注释除外）
-都会在启动 Lean 前被拒绝。生成成功不等于验证成功。
+诊断保留 file、line、column、severity、message 和 raw_message，并归类
+UNKNOWN_IDENTIFIER、UNKNOWN_TACTIC、TYPE_MISMATCH、APPLICATION_TYPE_MISMATCH、
+UNSOLVED_GOALS、FAILED_TO_SYNTHESIZE、AMBIGUOUS_TERM、PARSER_ERROR、MISSING_IMPORT、
+TIMEOUT、FORBIDDEN_CONSTRUCT、STATEMENT_CHANGED 等稳定代码。
+
+只有 IR 有效、token 扫描通过、statement 未变化、锁定环境返回 0、无超时和未完成目标时
+状态才是 verified。generated 不是成功。批量命令 chinese2lean verify-all
+examples/generated 会逐文件报告路径、耗时和诊断，任一失败返回非零。
 

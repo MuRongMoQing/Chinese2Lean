@@ -10,10 +10,93 @@ entries:
     notes: 全称量词
   - id: logic.exists
     canonical_zh: 存在
-    aliases: [至少存在一个]
+    aliases: [至少存在一个, 有一个]
     semantic_kind: quantifier
     lean_template: "∃ {variable}, {body}"
     precedence: 10
+    argument_count: 2
+    associativity: none
+    supported_types: [Nat, Int, Rat, Real]
+    contexts: [quantifier_prefix]
+    counterexamples:
+      - {chinese: "集合 A 有一个元素", note: "此处描述元素数量，不是受控量词前缀"}
+    version: 1
     examples: [{chinese: "存在自然数 n", lean: "∃ n : ℕ"}]
     notes: 存在量词
 
+  - id: logic.and
+    version: 1
+    canonical_zh: 且
+    aliases: [并且, 同时]
+    semantic_kind: binary_connective
+    lean_template: "{left} ∧ {right}"
+    lean_symbol: "∧"
+    argument_count: 2
+    precedence: 40
+    associativity: left
+    supported_types: [Prop]
+    contexts: [proposition]
+    examples: [{chinese: "x > 0 并且 y > 0", lean: "x > 0 ∧ y > 0"}]
+    counterexamples: [{chinese: "同时计算两个式子", note: "此处是时间副词，不是命题合取"}]
+    notes: 命题合取，只在两侧均为命题时使用
+  - id: logic.implies
+    version: 1
+    canonical_zh: 如果……那么……
+    aliases: [若……则……]
+    semantic_kind: binary_connective
+    lean_template: "{premise} → {conclusion}"
+    lean_symbol: "→"
+    argument_count: 2
+    precedence: 20
+    associativity: right
+    supported_types: [Prop]
+    contexts: [proposition]
+    examples: [{chinese: "如果 x > 0，那么 x + 1 > 0", lean: "x > 0 → x + 1 > 0"}]
+    counterexamples: [{chinese: "如果可能", note: "缺少那么引导的结论，作用域不完整"}]
+    notes: 受控句式必须同时出现前件和后件
+  - id: logic.not
+    version: 1
+    canonical_zh: "¬"
+    aliases: [并非]
+    semantic_kind: unary_connective
+    lean_template: "¬ {body}"
+    lean_symbol: "¬"
+    argument_count: 1
+    precedence: 60
+    associativity: none
+    supported_types: [Prop]
+    contexts: [proposition]
+    examples: [{chinese: "并非 x <= 0", lean: "¬ x ≤ 0"}]
+    counterexamples: [{chinese: "不小于 0", note: "整体是关系 >=，不能拆成否定和小于"}]
+    notes: 命题否定
+
+  - id: logic.quantified_variable_join
+    version: 1
+    canonical_zh: 和
+    aliases: []
+    semantic_kind: syntax_connector
+    lean_template: "{left} {right}"
+    argument_count: 2
+    precedence: 5
+    associativity: left
+    supported_types: [Nat, Int, Rat, Real]
+    contexts: [quantified_variable_list]
+    examples: [{chinese: "对任意实数 x 和 y", lean: "(x y : ℝ)"}]
+    counterexamples: [{chinese: "x 和 y 的和", note: "此处不是量词变量列表连接符"}]
+    notes: 只连接同一显式类型后的量词变量名称
+
+  - id: logic.or
+    version: 1
+    canonical_zh: 或者
+    aliases: []
+    semantic_kind: binary_connective
+    lean_template: "{left} ∨ {right}"
+    lean_symbol: "∨"
+    argument_count: 2
+    precedence: 30
+    associativity: left
+    supported_types: [Prop]
+    contexts: [proposition]
+    examples: [{chinese: "x > 0 或者 x = 0", lean: "x > 0 ∨ x = 0"}]
+    counterexamples: [{chinese: "整数或实数", note: "此处连接类型名称，不是命题析取"}]
+    notes: 命题析取，只在两侧均为命题时使用

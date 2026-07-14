@@ -6,6 +6,9 @@ _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_']*$")
 
 
 def _identifiers(expr: Expr) -> set[str]:
+    if expr.kind == "quantifier" and expr.args:
+        return _identifiers(expr.args[0]) - {str(expr.value)}
+
     found = {str(expr.value)} if expr.kind == "identifier" else set()
     for arg in expr.args:
         found.update(_identifiers(arg))

@@ -26,6 +26,7 @@ class Expr(BaseModel):
     value: str | int | float | None = None
     args: list[Expr] = Field(default_factory=list)
     inferred_type: str | None = None
+    binder_type: str | None = None
     source_span: SourceSpan | None = None
 
 
@@ -53,6 +54,7 @@ class WarningItem(BaseModel):
 
 
 class TheoremIR(BaseModel):
+    schema_version: Literal[1] = 1
     theorem_name: str
     variables: list[VariableDecl]
     assumptions: list[Assumption]
