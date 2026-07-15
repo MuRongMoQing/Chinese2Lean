@@ -162,6 +162,10 @@ def test_conversion_success_requires_locked_real_lean_verification() -> None:
     assert verified.status.value == "verified", verified.diagnostics
     assert verified.success and verified.verified
     assert verified.versions == {
+        "chinese2lean_version": "0.1.0",
+        "core_version": "0.1.0",
+        "desktop_version": "0.1.0",
+        "web_version": "0.1.0",
         "lean_version": "4.19.0",
         "mathlib_revision": "c44e0c8ee63ca166450922a373c7409c5d26b00b",
         "dictionary_version": "0.1.0",

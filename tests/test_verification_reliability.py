@@ -53,7 +53,7 @@ def test_diagnostics_keep_raw_message_and_normalize_categories() -> None:
 
 
 def test_runner_uses_locked_lake_environment_for_real_compilation() -> None:
-    result = LeanRunner(ROOT, timeout_seconds=60).verify_code(
+    result = LeanRunner(ROOT).verify_code(
         "import Mathlib\n\ntheorem locked_environment_smoke : (2 : ℕ) + 3 = 5 := by\n  norm_num\n"
     )
     assert result.success, result.stderr
@@ -115,7 +115,7 @@ def test_default_timeout_has_headroom_for_windows_lean_startup(
     result = LeanRunner(ROOT).verify_code('theorem timeout_headroom : True := by\n  trivial\n')
 
     assert result.success
-    assert observed['timeout'] == 60.0
+    assert observed['timeout'] == 120.0
 
 
 def test_timeout_returns_structured_diagnostic(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -134,8 +134,27 @@ def test_timeout_returns_structured_diagnostic(monkeypatch: pytest.MonkeyPatch) 
     assert result.command[-3:-1] == ["env", "lean"]
 
 
+def test_process_os_error_returns_structured_diagnostic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import subprocess
+
+    def denied(*args: object, **kwargs: object) -> None:
+        raise PermissionError("execution denied")
+
+    monkeypatch.setattr(subprocess, "run", denied)
+    result = LeanRunner(ROOT).verify_code("theorem denied : True := by\n  trivial\n")
+
+    assert not result.success
+    assert result.exit_code is None
+    assert result.stderr == "execution denied"
+    assert {item.code for item in result.diagnostics} == {"PROCESS_ERROR"}
+    assert result.command[-3:-1] == ["env", "lean"]
+
+
 def test_successful_system_lake_fallback_is_not_a_verified_success(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     import subprocess
 
@@ -145,11 +164,13 @@ def test_successful_system_lake_fallback_is_not_a_verified_success(
         stdout="",
         stderr="",
     )
+    unlocked_lake = tmp_path / "lake.exe"
+    unlocked_lake.write_bytes(b"")
     monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: completed)
     monkeypatch.setattr(
         LeanRunner,
         "_locked_lake",
-        staticmethod(lambda lake_root: ("lake", False)),
+        staticmethod(lambda lake_root: (str(unlocked_lake), False)),
     )
     result = LeanRunner(ROOT).verify_code("theorem unlocked : True := by\n  trivial\n")
     assert not result.success
@@ -190,3 +211,21 @@ def test_repair_can_add_a_missing_mathlib_import() -> None:
     assert attempt.diagnostic_category == "UNKNOWN_IDENTIFIER"
     assert attempt.change_summary == "添加锁定 Mathlib 的显式 import"
     assert attempt.statement_hash_before == attempt.statement_hash_after
+
+
+def test_missing_locked_lake_never_executes_a_path_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import subprocess
+
+    monkeypatch.setattr(LeanRunner, '_locked_lake', staticmethod(lambda lake_root: None))
+
+    def unexpected(*args: object, **kwargs: object) -> None:
+        raise AssertionError('subprocess must not run without the pinned Lake executable')
+
+    monkeypatch.setattr(subprocess, 'run', unexpected)
+    result = LeanRunner(ROOT).verify_code('theorem locked_only : True := by\n  trivial\n')
+
+    assert not result.success
+    assert result.exit_code is None
+    assert {item.code for item in result.diagnostics} == {'LOCKED_TOOLCHAIN_MISSING'}

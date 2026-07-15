@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
 import tempfile
 import time
 from pathlib import Path
@@ -11,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from chinese2lean.verification.diagnostics import LeanDiagnostic, parse_diagnostics
 from chinese2lean.verification.forbidden import find_forbidden_construct
+from chinese2lean.verification.process import AllowedCommand, ControlledProcessRunner
 
 
 class ForbiddenLeanConstruct(ValueError):
@@ -29,15 +28,9 @@ class LeanRunResult(BaseModel):
     locked_environment: bool = False
 
 
-def _as_text(value: str | bytes | None) -> str:
-    if isinstance(value, bytes):
-        return value.decode("utf-8", errors="replace")
-    return value or ""
-
-
 class LeanRunner:
     def __init__(
-        self, workspace: Path, *, timeout_seconds: float = 60.0, max_source_bytes: int = 1_000_000
+        self, workspace: Path, *, timeout_seconds: float = 120.0, max_source_bytes: int = 1_000_000
     ) -> None:
         self.workspace = workspace.resolve()
         self.timeout_seconds = timeout_seconds
@@ -51,7 +44,7 @@ class LeanRunner:
         return None
 
     @staticmethod
-    def _locked_lake(lake_root: Path) -> tuple[str, bool]:
+    def _locked_lake(lake_root: Path) -> tuple[str, bool] | None:
         toolchain_path = lake_root / "lean-toolchain"
         if toolchain_path.is_file():
             specification = toolchain_path.read_text(encoding="utf-8").strip()
@@ -66,8 +59,7 @@ class LeanRunner:
             pinned = elan_home / "toolchains" / directory / "bin" / executable
             if pinned.is_file():
                 return str(pinned), True
-        discovered = shutil.which("lake")
-        return discovered or "lake", False
+        return None
 
     @staticmethod
     def _subprocess_environment(lake_root: Path) -> dict[str, str]:
@@ -111,57 +103,73 @@ class LeanRunner:
                     )
                 ],
             )
-        lake, locked = self._locked_lake(lake_root)
+        locked_lake = self._locked_lake(lake_root)
+        if locked_lake is None:
+            return LeanRunResult(
+                success=False,
+                exit_code=None,
+                stderr="找不到 lean-toolchain 锁定的 lake 可执行文件",
+                diagnostics=[
+                    LeanDiagnostic(
+                        severity="error",
+                        code="LOCKED_TOOLCHAIN_MISSING",
+                        message="找不到 lean-toolchain 锁定的 lake 可执行文件",
+                    )
+                ],
+            )
+        lake, locked = locked_lake
         with tempfile.TemporaryDirectory(prefix="chinese2lean-") as temporary:
             generated = Path(temporary) / "Generated.lean"
             generated.write_text(source, encoding="utf-8", newline="\n")
-            command = [lake, "env", "lean", str(generated)]
             started = time.perf_counter()
-            try:
-                completed = subprocess.run(
-                    command,
-                    cwd=lake_root,
-                    env=self._subprocess_environment(lake_root),
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    timeout=self.timeout_seconds,
-                    check=False,
-                    shell=False,
-                )
-            except subprocess.TimeoutExpired as error:
+            completed = ControlledProcessRunner(
+                {
+                    "lean_verify": AllowedCommand(
+                        executable=Path(lake),
+                        working_directory=lake_root,
+                        timeout_seconds=self.timeout_seconds,
+                        fixed_arguments=("env", "lean"),
+                        argument_policy=lambda arguments: arguments == (str(generated),),
+                    )
+                }
+            ).execute(
+                "lean_verify",
+                arguments=(str(generated),),
+                environment=self._subprocess_environment(lake_root),
+            )
+            if completed.timed_out:
                 return LeanRunResult(
                     success=False,
                     exit_code=None,
-                    stdout=_as_text(error.stdout),
-                    stderr=_as_text(error.stderr),
+                    stdout=completed.stdout,
+                    stderr=completed.stderr,
                     timed_out=True,
                     diagnostics=[
                         LeanDiagnostic(severity="error", code="TIMEOUT", message="Lean 验证超时")
                     ],
                     duration_ms=(time.perf_counter() - started) * 1000,
-                    command=command,
+                    command=completed.command,
                     locked_environment=locked,
                 )
-            except FileNotFoundError:
+            if completed.error_code == "PROCESS_ERROR":
                 return LeanRunResult(
                     success=False,
                     exit_code=None,
-                    stderr="找不到 lake 可执行文件",
+                    stdout=completed.stdout,
+                    stderr=completed.stderr,
                     diagnostics=[
                         LeanDiagnostic(
                             severity="error",
-                            code="LAKE_NOT_FOUND",
-                            message="找不到 lake 可执行文件",
+                            code="PROCESS_ERROR",
+                            message=completed.stderr or "Lean 进程执行失败",
                         )
                     ],
                     duration_ms=(time.perf_counter() - started) * 1000,
-                    command=command,
+                    command=completed.command,
                     locked_environment=locked,
                 )
             combined = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
-            process_succeeded = completed.returncode == 0
+            process_succeeded = completed.success
             diagnostics = parse_diagnostics(combined)
             if process_succeeded and not locked:
                 diagnostics.append(
@@ -173,11 +181,11 @@ class LeanRunner:
                 )
             return LeanRunResult(
                 success=process_succeeded and locked,
-                exit_code=completed.returncode,
+                exit_code=completed.exit_code,
                 stdout=completed.stdout,
                 stderr=completed.stderr,
                 diagnostics=diagnostics,
                 duration_ms=(time.perf_counter() - started) * 1000,
-                command=command,
+                command=completed.command,
                 locked_environment=locked,
             )
