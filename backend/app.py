@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.models import HistoryResponse, UploadResponse
 from chinese2lean.api.app import create_app
-from chinese2lean.application.composition import ProductRuntime, build_product_runtime
+from chinese2lean.application import ProductRuntime, build_product_runtime
 from chinese2lean.storage import HistoryRecord
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

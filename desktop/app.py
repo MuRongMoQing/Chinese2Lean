@@ -7,7 +7,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
-from chinese2lean.application.composition import build_product_runtime
+from chinese2lean.application import build_product_runtime
 from desktop.controller import DesktopController, DesktopDocument
 from desktop.local_api import LocalApiClient, LocalApiServer
 

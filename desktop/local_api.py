@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 import uvicorn
 
 from chinese2lean.api.app import create_app
-from chinese2lean.application.composition import ProductRuntime
+from chinese2lean.application import ProductRuntime
 from chinese2lean.application.models import ConvertResponse, VerifyResponse
 
 

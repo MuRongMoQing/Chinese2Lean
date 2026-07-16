@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 
 from chinese2lean.api.schemas import TextRequest, VerifyRequest
-from chinese2lean.application.composition import ProductRuntime, build_product_runtime
+from chinese2lean.application import ProductRuntime, build_product_runtime
 from chinese2lean.application.models import (
     ConvertResponse,
     HealthResponse,
@@ -11,7 +11,6 @@ from chinese2lean.application.models import (
     VerifyResponse,
 )
 from chinese2lean.normalization.terminology import Terminology
-from chinese2lean.verification.runner import ForbiddenLeanConstruct
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -60,7 +59,7 @@ def create_app(
         product = current_runtime()
         try:
             response = product.service.verify(request.lean_code)
-        except (ForbiddenLeanConstruct, ValueError) as error:
+        except ValueError as error:
             product.loggers["lean"].warning("verify rejected: %s", error)
             product.loggers["error"].warning("verify rejected: %s", error)
             raise HTTPException(status_code=422, detail=str(error)) from error
