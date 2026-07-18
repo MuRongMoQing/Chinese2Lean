@@ -30,11 +30,17 @@ class LeanRunResult(BaseModel):
 
 class LeanRunner:
     def __init__(
-        self, workspace: Path, *, timeout_seconds: float = 120.0, max_source_bytes: int = 1_000_000
+        self,
+        workspace: Path,
+        *,
+        timeout_seconds: float = 120.0,
+        max_source_bytes: int = 1_000_000,
+        elan_home: Path | None = None,
     ) -> None:
         self.workspace = workspace.resolve()
         self.timeout_seconds = timeout_seconds
         self.max_source_bytes = max_source_bytes
+        self.elan_home = elan_home.resolve() if elan_home is not None else None
 
     def _lake_root(self) -> Path | None:
         current = self.workspace
@@ -43,18 +49,20 @@ class LeanRunner:
                 return candidate
         return None
 
-    @staticmethod
-    def _locked_lake(lake_root: Path) -> tuple[str, bool] | None:
+    def _locked_lake(self, lake_root: Path) -> tuple[str, bool] | None:
         toolchain_path = lake_root / "lean-toolchain"
         if toolchain_path.is_file():
             specification = toolchain_path.read_text(encoding="utf-8").strip()
             directory = specification.replace("/", "--").replace(":", "---")
-            elan_home_value = os.environ.get("ELAN_HOME")
-            if elan_home_value:
-                elan_home = Path(elan_home_value)
+            if self.elan_home is not None:
+                elan_home = self.elan_home
             else:
-                profile = Path(os.environ.get("USERPROFILE", str(Path.home())))
-                elan_home = profile / ".elan"
+                elan_home_value = os.environ.get("ELAN_HOME")
+                if elan_home_value:
+                    elan_home = Path(elan_home_value)
+                else:
+                    profile = Path(os.environ.get("USERPROFILE", str(Path.home())))
+                    elan_home = profile / ".elan"
             executable = "lake.exe" if os.name == "nt" else "lake"
             pinned = elan_home / "toolchains" / directory / "bin" / executable
             if pinned.is_file():

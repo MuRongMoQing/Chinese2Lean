@@ -1,14 +1,23 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
 from chinese2lean.application import build_product_runtime
+from chinese2lean.product.environment_backend import (
+    SystemEnvironmentBackend,
+    load_bundled_elan_asset,
+)
+from chinese2lean.product.initialization import EnvironmentInitializer
+from chinese2lean.product.logging import configure_product_logging
 from desktop.controller import DesktopController, DesktopDocument
+from desktop.initialization import launch_desktop
 from desktop.local_api import LocalApiClient, LocalApiServer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -236,18 +245,85 @@ class Chinese2LeanWindow:
         widget.configure(state="disabled")
 
 
-def main() -> None:
-    runtime = build_product_runtime(PROJECT_ROOT)
+def _user_data_root() -> Path:
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    return (base / "Chinese2Lean").resolve()
+
+
+def _close_loggers(loggers: dict[str, Any]) -> None:
+    for logger in loggers.values():
+        for handler in logger.handlers[:]:
+            handler.close()
+            logger.removeHandler(handler)
+
+
+def _launch_product(
+    root: tk.Tk,
+    initializer: EnvironmentInitializer,
+    data_root: Path,
+    elan_home: Path,
+) -> Any:
+    runtime = build_product_runtime(
+        PROJECT_ROOT,
+        storage_root=data_root / "storage",
+        log_root=data_root / "logs",
+        verification_root=initializer.workspace_root,
+        elan_home=elan_home,
+    )
     server = LocalApiServer(runtime)
-    server.start()
     try:
+        server.start()
         controller = DesktopController(
             LocalApiClient(server.base_url),
             runtime.history,
             PROJECT_ROOT / "examples" / "chinese",
         )
-        root = tk.Tk()
         Chinese2LeanWindow(root, controller)
+    except Exception:
+        server.stop()
+        _close_loggers(runtime.loggers)
+        raise
+
+    def cleanup() -> None:
+        server.stop()
+        _close_loggers(runtime.loggers)
+
+    return cleanup
+
+
+def main() -> None:
+    root = tk.Tk()
+    data_root = _user_data_root()
+    bootstrap_loggers = configure_product_logging(data_root / "logs")
+    environment_backend = SystemEnvironmentBackend(
+        PROJECT_ROOT,
+        data_root / "environment",
+        bootstrap_asset=load_bundled_elan_asset(PROJECT_ROOT / "runtime"),
+    )
+    initializer = EnvironmentInitializer(
+        PROJECT_ROOT,
+        data_root / "state",
+        environment_backend,
+        bootstrap_loggers["environment"],
+    )
+    application = launch_desktop(
+        root,
+        initializer,
+        lambda application_root: _launch_product(
+            application_root,
+            initializer,
+            data_root,
+            environment_backend.elan_home,
+        ),
+    )
+    try:
+        application.start()
         root.mainloop()
     finally:
-        server.stop()
+        application.shutdown()
+        _close_loggers(bootstrap_loggers)

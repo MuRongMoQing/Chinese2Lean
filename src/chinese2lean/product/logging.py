@@ -11,11 +11,17 @@ _SENSITIVE_VALUE = re.compile(
 )
 
 
+def redact_sensitive_values(message: str) -> str:
+    """Remove common credential assignments from persisted and displayed logs."""
+
+    return _SENSITIVE_VALUE.sub(r"\1=[REDACTED]", message)
+
+
 class SensitiveValueFilter(logging.Filter):
     """Redact common credential assignments before writing a record."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.msg = _SENSITIVE_VALUE.sub(r"\1=[REDACTED]", record.getMessage())
+        record.msg = redact_sensitive_values(record.getMessage())
         record.args = ()
         return True
 

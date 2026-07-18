@@ -40,14 +40,21 @@ class Converter:
         self.project_root = (project_root or Path.cwd()).resolve()
 
     @classmethod
-    def default(cls, root: Path | None = None) -> "Converter":
+    def default(
+        cls,
+        root: Path | None = None,
+        *,
+        verification_root: Path | None = None,
+        elan_home: Path | None = None,
+    ) -> "Converter":
         project_root = (root or Path.cwd()).resolve()
+        lean_workspace = (verification_root or project_root).resolve()
         terminology = Terminology.load(project_root / "terminology")
         return cls(
             Normalizer(terminology),
             StatementParser(),
             LeanRenderer(),
-            LeanRunner(project_root),
+            LeanRunner(lean_workspace, elan_home=elan_home),
             project_root=project_root,
         )
 

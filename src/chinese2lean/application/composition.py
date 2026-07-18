@@ -55,8 +55,11 @@ def build_product_runtime(
     *,
     storage_root: Path | None = None,
     log_root: Path | None = None,
+    verification_root: Path | None = None,
+    elan_home: Path | None = None,
 ) -> ProductRuntime:
     root = project_root.resolve()
+    lean_workspace = (verification_root or root).resolve()
     config = load_product_config(root / "config" / "config.yaml")
     terminology = Terminology.load(root / "terminology")
     resolved_storage = (
@@ -71,8 +74,8 @@ def build_product_runtime(
         resolved_storage / "artifacts",
     )
     service = Chinese2LeanService(
-        Converter.default(root),
-        LeanRunner(root),
+        Converter.default(root, verification_root=lean_workspace, elan_home=elan_home),
+        LeanRunner(lean_workspace, elan_home=elan_home),
         PinnedVersionProvider(root, dictionary_version=terminology.version),
     )
     loggers["startup"].info("Chinese2Lean product runtime initialized")
